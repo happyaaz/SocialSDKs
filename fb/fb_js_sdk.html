@@ -1,0 +1,516 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script src="jquery-3.0.0.js"></script>
+    <script src="jquery-ui.js"></script>
+    <title>Facebook Login JavaScript</title>
+    <style>
+        .ui-widget-header, .ui-state-default, ui-button {
+            background: #808080;
+            border: 1px solid #b9cd6d;
+            color: #FFFFFF;
+            font-weight: bold;
+        }
+
+        .chosenInstaImage {
+            padding: 1px;
+            border: 1px solid #4292bc;
+        }
+    </style>
+</head>
+<body>
+
+
+
+    <script>
+	  // This is called with the results from from FB.getLoginStatus().
+	  function statusChangeCallback(response) {
+
+		  //  Logged into your app and Facebook.
+		if (response.status === 'connected') {
+			//  disable the login facebook button
+			$.fn.hideFacebookButton();
+			//  Get your page list
+			FbGetPages ();
+		}
+		else
+		{
+			FbLogin();
+		}
+	  }
+
+	  // This function is called when someone finishes with the Login button
+	  function checkLoginState() {
+
+		FB.getLoginStatus(function(response) {
+		  statusChangeCallback(response);
+		});
+	  }
+
+	  window.fbAsyncInit = function() {
+		  FB.init({
+		      appId: '{APP-ID}',  //  change it to  app id
+			cookie     : true,  // enable cookies to allow the server to access
+								// the session
+			xfbml      : true,  // parse social plugins on this page
+			version    : 'v2.5' // use graph api version 2.5
+		  });
+
+		  FB.getLoginStatus(function(response) {
+			statusChangeCallback(response);
+		  });
+
+	  };
+
+	  // Load the SDK asynchronously
+	  (function(d, s, id) {
+		var js, fjs = d.getElementsByTagName(s)[0];
+		if (d.getElementById(id)) return;
+		js = d.createElement(s); js.id = id;
+		js.src = "//connect.facebook.net/en_US/sdk.js";
+		fjs.parentNode.insertBefore(js, fjs);
+	  }(document, 'script', 'facebook-jssdk'));
+
+	  //  load some other shit
+	  (function(d, s, id) {
+			  var js, fjs = d.getElementsByTagName(s)[0];
+			  if (d.getElementById(id)) return;
+			  js = d.createElement(s); js.id = id;
+			  js.src = "//connect.facebook.net/nl_NL/all.js#xfbml=1&appId={APP-ID}";
+			  fjs.parentNode.insertBefore(js, fjs);
+			}(document, 'script', 'facebook-jssdk'));
+
+
+	  //  just for getting the access token
+	  function FbLogin() {
+
+		FB.api('/me', function(response) {
+
+		//  need to store it somewhere
+		var access_token =   FB.getAuthResponse()['accessToken'];
+			console.log('Access Token = '+ access_token);
+		});
+	  }
+
+		function readCookie(name) {
+			var nameEQ = name + "=";
+			var ca = document.cookie.split(';');
+			for(var i=0;i < ca.length;i++) {
+				var c = ca[i];
+				while (c.charAt(0)==' ') c = c.substring(1,c.length);
+				if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+			}
+			return null;
+		}
+
+
+	//  the shit before this comment - common facebook code. Below - custom stuff
+
+
+	  //  Get a list of pages you are an admin of
+	  function FbGetPages() {
+
+		FB.api('/me/accounts/?type=pages', function(response) {
+
+			//  get pages if there are any
+			var pages = "<br><br>";
+			var numberOfMusicianPages = 0;
+
+			for (i = 0; i < response.data.length; i++) {
+				var obj = response.data[i];
+				//  only musicians pages
+				if (obj.category == "Musician/Band")
+				{
+					numberOfMusicianPages ++;
+					pages += '<button type="button" class = "availablePage" id="' + obj.id + '">' + obj.name + "</button>";
+				}
+			}
+			//  if there are pages, then actually print them out
+			if (numberOfMusicianPages > 0)
+			{
+				//  Find a div element where we would store the list
+				document.getElementById('fb_pages').innerHTML = pages;
+				$.fn.openAnyFacebookDialog("#social");
+			}
+			else
+			{
+				noMusicianPagesHTML = '<div id="noMusicianPages">You are not an admin for any musician pages</div>';
+				document.getElementById('fb_pages').innerHTML = noMusicianPagesHTML;
+			}
+		});
+	  }
+
+		//  pop up that would contain all pages a user is an admin of
+		$(function() {
+            $( "#social" ).dialog({
+               autoOpen: false,
+			   closeOnEscape: false,
+			   dialogClass: "noclose",
+               position: {
+                  my: "center",
+                  at: "center"
+               }
+            });
+         });
+
+
+
+		//  pop up for displaying photos
+		$(function() {
+            $( "#fbPhotosToChooseFrom" ).dialog({
+               autoOpen: false,
+			   width: 740,
+			   closeOnEscape: false,
+			   dialogClass: "noclose",
+               position: {
+                  my: "top",
+                  at: "top"
+               }
+            });
+         });
+
+		//  hide the facebook button
+		$.fn.hideFacebookButton = function() {
+			$( "#facebook_login_button" ).empty();
+		};
+
+		//  open any facebook dialog
+		$.fn.openAnyFacebookDialog = function(dialogId) {
+			$(dialogId).dialog( "open" );
+		};
+
+		//  hide any facebook dialog
+		$.fn.closeAnyFacebookDialog = function(dialogId) {
+			$(dialogId).empty();
+			$(dialogId).dialog( "destroy" );
+		};
+
+
+
+		//  for storing page's id, will use it later for embedding posts
+		var pageId_int = 0;
+
+
+		//  jquery stuff for choosing which group you want to take info from
+		// .blabla - choosing a class of div - can be anything, in my case it's either a group or
+		$( document ).ready(function() {
+
+			//  if we click on any div element contating a name of a page you are an admin of, then get all the needed page info
+			$( '#social' ).on( 'click', '#fb_pages .availablePage', function () { GetPageInfo (this.id); GetPageLastPhotos (this.id); pageId_int = this.id});
+
+			function GetPageInfo(id) {
+
+				//  empty and close the pop up
+				$.fn.closeAnyFacebookDialog("#social");
+
+				//  get the needed info from the page
+				FB.api('/' + id + '?fields=cover,bio,description,name,current_location,genre,booking_agent,website,band_members,hometown,start_info,fan_count', function(response) {
+
+					//  open a pop up with photos
+					$.fn.openAnyFacebookDialog("#fbPhotosToChooseFrom" );
+
+					response.name == null ? $( "#band_name" ).text("No data on FB"): $( "#band_name" ).text("Band name: " + response.name);
+					response.current_location == null ? $( "#band_location" ).text("Location: No data on FB"):
+											$( "#band_location" ).text("Location: " + response.current_location);
+					response.genre == null ? $( "#band_genre" ).text("Genre: No data on FB"): $( "#band_genre" ).text("Genre: " + response.genre);
+					response.description == null ? $( "#band_description" ).text("Description: No data on FB"):
+											$( "#band_description" ).text("Description: " + response.description);
+					response.bio == null ? $( "#band_bio" ).text("Bio: No data on FB"): $( "#band_bio" ).text("Bio: " + response.bio);
+
+
+					response.band_members == null ? $( "#band_bio" ).text("Band_members: No data on FB"): $( "#band_members" ).text("Band_members: " + response.band_members);
+					response.booking_agent == null ? $( "#band_bio" ).text("Booking_agent: No data on FB"): $( "#booking_agent" ).text("Booking_agent: " + response.booking_agent);
+					response.hometown == null ? $( "#band_bio" ).text("Hometown: No data on FB"): $( "#hometown" ).text("Hometown: " + response.hometown);
+					response.website == null ? $( "#band_bio" ).text("Website: No data on FB"): $( "#website" ).text("Website: " + response.website);
+					//  number of likes
+					$( "#number_of_likes" ).text("Number of likes: "  + response.fan_count);
+
+					//console.log (response.cover.source);
+					//AppendPhotoToDivBlock ("#band_cover", response.cover.source, "", 'id="cover_picture"', 720);
+
+				});
+
+				FB.api('/' + id + '?fields=picture', function(response) {
+
+					FB.api('/' + response.id + '/picture?redirect=false&height=400', function(response) {
+
+						//AppendPhotoToDivBlock ("#band_profile_picture", response.data.url, "", 'id="profile_photo"', 720);
+					});
+				});
+			}
+			$( "#previousFBPhotos" ).click(function() {
+
+					console.log ("previousFBPhotos");
+					currentPage --;
+
+					firstPhotoIdToDisplay = currentPage * fbPhotosPerPage;
+					lastPhotoIdToDisplay = firstPhotoIdToDisplay + fbPhotosPerPage;
+
+
+					console.log ("Back " + currentPage);
+					console.log ("Back " + firstPhotoIdToDisplay);
+					console.log ("Back " + firstPhotoIdToDisplay);
+
+					EmbedFbPhotosToPopup ();
+
+					$( "#nextFBPhotos" ).show ();
+					if (currentPage == 0)
+					{
+						$( "#previousFBPhotos" ).hide ();
+					}
+			  });
+
+			  $( "#nextFBPhotos" ).click(function() {
+					console.log ("nextFBPhotos");
+					currentPage ++;
+					firstPhotoIdToDisplay = currentPage * fbPhotosPerPage;
+					if (firstPhotoIdToDisplay + fbPhotosPerPage > totalNumberOfFbPhotos)
+					{
+						lastPhotoIdToDisplay = totalNumberOfFbPhotos;
+					}
+					else
+					{
+						lastPhotoIdToDisplay = firstPhotoIdToDisplay + fbPhotosPerPage;
+					}
+
+					console.log ("Back " + currentPage);
+					console.log ("Forward " + firstPhotoIdToDisplay);
+					console.log ("Forward " + lastPhotoIdToDisplay);
+
+					EmbedFbPhotosToPopup ();
+
+					$( "#previousFBPhotos" ).show ();
+					if (currentPage == numberOfPagesWithFbPhotos - 1)
+					{
+						$( "#nextFBPhotos" ).hide ();
+					}
+			  });
+		});
+
+
+			var fbPhotosData;
+			var totalNumberOfFbPhotos = 0;
+			var fbPhotosPerPage = 2;
+			var numberOfPagesWithFbPhotos = 0;
+			var currentPage = 0;
+			var firstPhotoIdToDisplay = 0;
+			var lastPhotoIdToDisplay = fbPhotosPerPage;
+
+
+
+
+		function EmbedFbPhotosToPopup () {
+
+			$("#fb_photos").empty();
+				for (i = firstPhotoIdToDisplay; i < lastPhotoIdToDisplay; i ++)
+				{
+					FB.api('/' + fbPhotosData [i]["id"] + '/picture?redirect=false', function(response) {
+
+						AppendPhotoToDivBlock ("#fb_photos", response.data.url, 'class="band_photo"', "", 360);
+
+					});
+				}
+		}
+
+
+		function GetPageLastPhotos(id) {
+
+
+			FB.api('/' + id + '/photos?type=uploaded', function(response) {
+
+				var arrayWithPhotosIds = response.data;
+				fbPhotosData = arrayWithPhotosIds;
+				totalNumberOfFbPhotos = arrayWithPhotosIds.length;
+
+				numberOfPagesWithFbPhotos = Math.ceil(totalNumberOfFbPhotos / fbPhotosPerPage);
+				  console.log (numberOfPagesWithFbPhotos);
+
+				  console.log (totalNumberOfFbPhotos);
+				  console.log (fbPhotosData);
+				  if (totalNumberOfFbPhotos <= fbPhotosPerPage)
+				  {
+					$( "#previousFBPhotos" ).hide ();
+					$( "#nextFBPhotos" ).hide ();
+				  }
+				  else
+				  {
+					$( "#previousFBPhotos" ).hide ();
+				  }
+
+
+				//  if there are no photos, don't do anything
+				if (totalNumberOfFbPhotos == 0)
+				{
+					return;
+				}
+
+				EmbedFbPhotosToPopup ();
+			});
+		}
+
+
+		function ReturnOriginalSizePhoto (photoLink) {
+
+			return photoLink.replace ("/s720x720", "");
+		}
+
+
+		var fbPhotosToSave = [];
+
+		function AppendPhotoToDivBlock (divBlock, photoSource, photoClass, photoId, photoWidth) {
+
+			if (photoSource != null)
+			{
+				var img = $('<img '  + photoId + ' width="' + photoWidth +'">');
+				img.attr('src', photoSource);
+				img.appendTo(divBlock);
+
+				if ($.inArray(photoSource, fbPhotosToSave ) != -1)
+				{
+					//var clickedImage = $(this);
+					img.addClass("chosenInstaImage");
+
+					console.log ("Added class");
+				}
+			}
+		}
+
+
+		//  when photos are chosen, do something
+		$(document).ready(function() {
+
+			//  when you indicate that you have chosen photos u wanna display
+			$( "#photosAreChosen" ).click(function() {
+
+				fbPhotosToSave.forEach(function(item, i, arr) {
+
+					AppendPhotoToDivBlock ("#band_photos", item, "", "", 720);
+				});
+
+				$.fn.closeAnyFacebookDialog ("#fbPhotosToChooseFrom" );
+
+				GetFacebookPosts (pageId_int);
+			});
+
+			//  choose images that you wanna transfer
+			//  body - because the shit is loaded dynamically
+
+			$('body').on('click','#fbPhotosToChooseFrom #fb_photos img',function(){
+				//  if such photo wasn't chosen yet
+				if ($.inArray(this.src, fbPhotosToSave ) == -1)
+				{
+					fbPhotosToSave.push (this.src);
+					var clickedImage = $(this);
+					clickedImage.addClass("chosenInstaImage");
+
+					console.log ("Added maybe");
+				}
+				else
+				{
+					//  else remove it
+					var clickedImage = $(this);
+					clickedImage.removeClass("chosenInstaImage");
+					console.log ("Remove");
+					fbPhotosToSave.splice( $.inArray(this.src,fbPhotosToSave) ,1 );
+				}
+			})
+		});
+
+
+		//  as long as we have a facebook page's id, it is possible to use embedded posts
+		//  can store it as a separate function somewhere
+		function GetFacebookPosts (_page_id_int) {
+
+			FB.api('/' + pageId_int + '/feed', function(response) {
+
+
+				var numberOfPostsToTake_int = 3;
+
+				if (numberOfPostsToTake_int > response['data'].length)
+				{
+					numberOfPostsToTake_int = response['data'].length;
+				}
+
+				var fbPosts = "";
+
+				for (i = 0; i < numberOfPostsToTake_int; i ++)
+				{
+
+					var res = response['data'][i]['id'].split("_");
+					var linkToPost = "https://www.facebook.com/" + res [0] + "/posts/" + res [1] + "/";
+
+					fbPosts += '<div class="fb-post" data-href="' + linkToPost +  '" data-width="500"></div><br><br>';
+				}
+				document.getElementById('band_posts').innerHTML = fbPosts;
+				//  apparently I need to run this function to update all the shit
+				FB.XFBML.parse();
+			});
+		}
+
+    </script>
+
+
+    <!--
+      Below we include the Login Button social plugin. This button uses
+      the JavaScript SDK to present a graphical Login button that triggers
+      the FB.login() function when clicked.
+    -->
+
+
+    <div id="facebook_login_button">
+        <fb:login-button scope="public_profile,email,user_managed_groups,manage_pages" onlogin="checkLoginState();">
+        </fb:login-button>
+    </div>
+    <div id="status">
+    </div>
+
+    <div id="social">
+        <div id="fb_pages">
+        </div>
+        <div id="fb_groups">
+        </div>
+    </div>
+
+    <div id="fbPhotosToChooseFrom">
+        <div id="fb_photos">
+        </div>
+        <button id="previousFBPhotos">Previous</button>
+        <button id="nextFBPhotos">Next</button>
+        <button type="button" id="photosAreChosen">Click here when you are done choosing photos</button>
+    </div>
+
+
+    <div id="band_info">
+        <div id="band_name">
+        </div>
+        <div id="band_bio">
+        </div>
+        <div id="band_description">
+        </div>
+        <div id="band_genre">
+        </div>
+        <div id="band_location">
+        </div>
+        <div id="band_members">
+        </div>
+        <div id="booking_agent">
+        </div>
+        <div id="website">
+        </div>
+        <div id="hometown">
+        </div>
+        <div id="number_of_likes">
+        </div>
+        <div id="band_cover">
+        </div>
+        <div id="band_profile_picture">
+        </div>
+        <div id="band_photos">
+            Chosen band's photos <br /><br />
+        </div>
+    </div>
+    <script id="facebook-jssdk" src="//connect.facebook.net/en_US/sdk.js"></script>
+    <div id="band_posts">
+    </div>
+</body>
+</html>

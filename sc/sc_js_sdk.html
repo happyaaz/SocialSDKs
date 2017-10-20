@@ -1,0 +1,284 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script src="jquery-3.0.0.js"></script>
+    <script src="jquery-ui.js"></script>
+    <script src="https://connect.soundcloud.com/sdk/sdk-3.1.2.js"></script>
+    <style type="text/css">
+        #player {
+            width: 500px;
+        }
+    </style>
+</head>
+<body>
+    <button id="connect">connect</button>
+
+    <div id="player"></div>
+    <div id="player_popup">
+        <button class="ghost-btn" id="previousSCTracks">Previous</button>
+        <button class="ghost-btn" id="nextSCTracks">Next</button>
+        <div id="tracksToChooseFrom">
+        </div>
+        <button class="ghost-btn" type="button" id="tracksAreChosen">Click here when you are done choosing photos</button>
+    </div>
+    <script>
+			SC.initialize({
+			    client_id: "{APP-ID}",
+				redirect_uri: "http://{website}/soundcloud-js/callback.html"
+			  });
+
+
+			//  pop up that would contain all pages a user is an admin of
+		$(function() {
+            $( "#player_popup" ).dialog({
+				autoOpen: false,
+				open: function(event, ui) { $(".ui-dialog-titlebar-close").hide(); },
+				modal: true,
+				width:500,
+				closeOnEscape: false,
+				position: {
+                  my: "top",
+                  at: "top"
+				}
+            });
+         });
+
+		//  open any facebook dialog
+		$.fn.openAnySoundcloudDialog = function(dialogId) {
+			$(dialogId).dialog( "open" );
+		};
+
+		//  hide any facebook dialog
+		$.fn.closeAnySoundcloudDialog = function(dialogId) {
+			$(dialogId).empty();
+			$(dialogId).dialog( "destroy" );
+		};
+
+		var tracksToSave = [];
+
+
+		$(document).ready(function() {
+
+			//  for choosing which tracks you want to be embedded
+			$('body').on('click','.soundcloudCheckbox',function(){
+				//  if such photo wasn't chosen yet
+				//console.log ("CLICKED = " + this.id);
+				if (jQuery.inArray(dictionaryWithTracks [this.id], tracksToSave ) == -1)
+				{
+					// add it to the array
+					console.log ("Add");
+					tracksToSave.push (dictionaryWithTracks [this.id]);
+				}
+				else
+				{
+					//  else remove it
+					console.log ("Remove");
+					tracksToSave.splice( $.inArray(dictionaryWithTracks [this.id],tracksToSave) ,1 );
+				}
+			});
+
+
+			var stringsForEmbeddingTracks = [];
+			$( "#tracksAreChosen" ).click(function() {
+
+				$.fn.closeAnySoundcloudDialog ("#player_popup" );
+
+				if (tracksToSave.length > 0)
+				{
+					console.log (tracksToSave.length);
+
+					var finalInfoAboutTracks = "";
+
+					/*
+					for(key in dictionaryWithTracks){
+					  var value = dictionaryWithTracks[key];
+					  finalInfoAboutTracks += value;
+					}
+					*/
+					for (i = 0; i < tracksToSave.length; i++)
+					{
+						finalInfoAboutTracks += tracksToSave [i] + "___";
+					}
+
+					$("#player").text( finalInfoAboutTracks );
+				}
+			});
+
+
+
+			 $( "#connect" ).click(function() {
+				SC.connect().then(function() {
+				  return SC.get('/me');
+				}).then(function(me) {
+				  $("#connect").remove();
+				  //console.log (JSON.stringify(me));
+				  getBasicInfo(me);
+				  return SC.get('/users/' + me.id + '/tracks');
+				}).then(function(tracks) {
+				  //console.log (JSON.stringify(tracks));
+
+
+				  numberOfPagesWithTracks = Math.ceil(tracks.length / tracksPerPage);
+				  console.log (numberOfPagesWithTracks);
+				  totalNumberOfTracks = tracks.length;
+				  scTracks = tracks;
+
+				  if (totalNumberOfTracks <= tracksPerPage)
+				  {
+					$( "#previousSCTracks" ).hide ();
+					$( "#nextSCTracks" ).hide ();
+				  }
+				  else
+				  {
+					$( "#previousSCTracks" ).hide ();
+				  }
+
+				  getTracksLinks (tracks);
+				});
+			  });
+
+			  //  pagination
+			  var scTracks;
+			  var totalNumberOfTracks = 0;
+			  var tracksPerPage = 2;
+			  var numberOfPagesWithTracks = 0;
+			  var currentPage = 0;
+			  var firstTrackScToDisplay = 0;
+			  var lastTrackScToDisplay = tracksPerPage;
+
+
+			  $( "#previousSCTracks" ).click(function() {
+
+					//console.log ("previousSCTracks");
+					currentPage --;
+
+					firstTrackScToDisplay = currentPage * tracksPerPage;
+					lastTrackScToDisplay = firstTrackScToDisplay + tracksPerPage;
+
+
+					//console.log ("Back " + currentPage);
+					//console.log ("Back " + firstTrackScToDisplay);
+					//console.log ("Back " + lastTrackScToDisplay);
+
+					EmbedTracksInPopup (scTracks);
+
+					$( "#nextSCTracks" ).show ();
+					if (currentPage == 0)
+					{
+						$( "#previousSCTracks" ).hide ();
+					}
+			  });
+
+			  $( "#nextSCTracks" ).click(function() {
+					//console.log ("nextSCTracks");
+					currentPage ++;
+					firstTrackScToDisplay = currentPage * tracksPerPage;
+					if (firstTrackScToDisplay + tracksPerPage > totalNumberOfTracks)
+					{
+						lastTrackScToDisplay = totalNumberOfTracks;
+					}
+					else
+					{
+						lastTrackScToDisplay = firstTrackScToDisplay + tracksPerPage;
+					}
+
+					//console.log ("Back " + currentPage);
+					//console.log ("Forward " + firstTrackScToDisplay);
+					//console.log ("Forward " + lastTrackScToDisplay);
+
+					EmbedTracksInPopup (scTracks);
+
+					$( "#previousSCTracks" ).show ();
+					if (currentPage == numberOfPagesWithTracks - 1)
+					{
+						$( "#nextSCTracks" ).hide ();
+					}
+			  });
+
+			//  get basic info about a user
+			function getBasicInfo (me) {
+
+				console.log ("username: " + me.username);
+				console.log ("number of followers: " + me.followers_count);
+				console.log ("number of people followed: " + me.followings_count);
+			}
+
+
+			function EmbedTracksInPopup (tracks)
+			{
+				$( "#tracksToChooseFrom" ).empty ();
+
+				//console.log (tracksToSave);
+
+				for (var i = firstTrackScToDisplay; i < lastTrackScToDisplay; i++)
+				{
+					var sclUrl = "<input type=\"checkbox\"" + " id = " + tracks[i].id +" class = \"soundcloudCheckbox\">";
+					$( "#tracksToChooseFrom" ).append( sclUrl );
+
+					//console.log ("tracksToSave = " + tracksToSave);
+					/*
+					if (jQuery.inArray(this.id, tracksToSave ) != -1)
+					{
+						console.log ("Exists!!!!");
+					}
+					*/
+					//var soundcloudEmbeddedTrack;
+					if (tracks[i].sharing === "private")
+					{
+						//console.log (tracks[i]);
+						var soundcloudEmbeddedTrack = returnEmbeddedStringForPrivateTrack (tracks[i].secret_uri);
+						//console.log (soundcloudEmbeddedTrack);
+						$("#tracksToChooseFrom").append( soundcloudEmbeddedTrack );
+						dictionaryWithTracks [tracks[i].id] = soundcloudEmbeddedTrack;
+
+						//  if there's any checkbox already checked - check it
+						console.log ("jQuery.inArray(soundcloudEmbeddedTrack, tracksToSave ) = " + jQuery.inArray(soundcloudEmbeddedTrack, tracksToSave ));
+						if (jQuery.inArray(soundcloudEmbeddedTrack, tracksToSave ) != -1)
+						{
+							$( "#" + tracks[i].id ).prop( "checked", true );
+						}
+					}
+					else
+					{
+						var soundcloudEmbeddedTrack = returnEmbeddedStringForPublicTrack (tracks[i].id);
+						$("#tracksToChooseFrom").append( soundcloudEmbeddedTrack );
+						dictionaryWithTracks [tracks[i].id] = soundcloudEmbeddedTrack;
+						//  if there's any checkbox already checked - check it
+						console.log ("jQuery.inArray(soundcloudEmbeddedTrack, tracksToSave ) = " + jQuery.inArray(soundcloudEmbeddedTrack, tracksToSave ));
+						if (jQuery.inArray(soundcloudEmbeddedTrack, tracksToSave ) != -1)
+						{
+							$( "#" + tracks[i].id ).prop( "checked", true );
+						}
+					}
+				}
+			}
+
+
+			var dictionaryWithTracks = {};
+
+			function getTracksLinks (tracks) {
+				if (tracks.length > 0)
+				{
+					$.fn.openAnySoundcloudDialog("#player_popup");
+
+					EmbedTracksInPopup (tracks);
+				}
+			}
+
+			function returnEmbeddedStringForPublicTrack (trackId) {
+
+				return "<iframe width=\"100%\" height=\"100\" scrolling=\"no\" frameborder=\"no\" src=\"https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/"
+							+ trackId + "&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true\"></iframe>"
+			}
+
+			function returnEmbeddedStringForPrivateTrack (trackId) {
+
+				return "<iframe width=\"100%\" height=\"100\" scrolling=\"no\" frameborder=\"no\" src=\"https://w.soundcloud.com/player/?url="
+							+ trackId + "&amp;auto_play=false&amp;hide_related=false&amp;show_comments=true&amp;show_user=true&amp;show_reposts=false&amp;visual=true\"></iframe>"
+			}
+		});
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,108 @@
+﻿<html>
+<head>
+
+    <style type="text/css">
+        html {
+            height: 100%;
+        }
+
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #map_canvas {
+            height: 100%;
+        }
+    </style>
+    <script type="text/javascript"
+            src="http://maps.googleapis.com/maps/api/js?key={APP-ID}">
+    </script>
+    <script type="text/javascript">
+
+
+
+
+var locations = [
+  ['title 1', 59.911491, 10.757933, 'link 1'],
+  ['title 2', 58.969975, 5.733107, 'link 2'],
+  ['title 3', 59.284073, 11.109403, 'link 3'],
+  ['title 4', 69.649208, 18.955324, 'link 4'],
+  ['title 5', 55.676098, 12.568337, 'link 5'],
+  ['title 1', 56.140934, 8.968116, 'link 1'],
+  ['title 2', 57.046707, 9.935932, 'link 2'],
+  ['title 3', 56.362564, 8.621231, 'link 3'],
+  ['title 4', 59.334591, 18.063240, 'link 4'],
+  ['title 5', 58.351307, 11.885834, 'link 5'],
+  ['title 4', 57.751442, 16.628838, 'link 4'],
+  ['title 5', 57.708870, 11.974560, 'link 5']
+  ];
+
+  function initialize() {
+
+      
+
+    var myOptions = {
+        center: new google.maps.LatLng(64.01487, 11.49537),
+      zoom: 4,
+      mapTypeId: google.maps.MapTypeId.ROADMAP
+
+    };
+    var map = new google.maps.Map(document.getElementById("default"),
+        myOptions);
+
+    setMarkers(map,locations)
+
+  }
+
+
+
+function setMarkers(map,locations){
+
+        var marker, i
+
+        for (i = 0; i < locations.length; i++)
+        {
+
+             var title = locations[i][0]
+             var lat = locations[i][1]
+             var long = locations[i][2]
+             var url =  locations[i][3]
+
+            latlngset = new google.maps.LatLng(lat, long);
+
+            var marker = new google.maps.Marker({
+
+                 map: map,
+                 title: title,
+                 position: latlngset,
+                 animation: google.maps.Animation.DROP
+                });
+            map.setCenter(marker.getPosition())
+
+
+            var content = "title Number: " + title + '</h3>' + "Address: " + long
+
+            var content = "<div><h3>" + title + "</h3></div><a href='" + url + "'><p>View concert details</a></p></div>";
+
+            var infowindow = new google.maps.InfoWindow()
+
+            google.maps.event.addListener(marker,'click', (function(marker,content,infowindow){
+                    return function() {
+                       infowindow.setContent(content);
+                       infowindow.open(map,marker);
+                    };
+                })(marker,content,infowindow));
+
+      }
+  }
+
+
+
+    </script>
+</head>
+<body onload="initialize()">
+    <div id="default" style="width:70%; height:70%"></div><div id="map_canvas" style="width:400px; height:400px"></div>
+</body>
+</html>

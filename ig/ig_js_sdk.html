@@ -1,0 +1,287 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+
+    <script src="jquery-3.0.0.js"></script>
+    <script src="jquery-ui.js"></script>
+    <title>Here it is</title>
+    <style>
+        .ui-widget-header, .ui-state-default, ui-button {
+            background: #808080;
+            border: 1px solid #b9cd6d;
+            color: #FFFFFF;
+            font-weight: bold;
+        }
+
+        .chosenInstaImage {
+            padding: 1px;
+            border: 1px solid #4292bc;
+        }
+    </style>
+</head>
+<body>
+    <div id="instaLogin">
+        <button type="button" id="instaLoginButton">Log in</button>
+    </div>
+
+    <div id="instagramPopup">
+
+        <div id="instaPhotos"></div>
+
+        <button class="ghost-btn" id="previousIGPhotos">Previous</button>
+        <button class="ghost-btn" id="nextIGPhotos">Next</button>
+        <button class="ghost-btn" type="button" id="instaPhotosAreChosen">Click here when you are done choosing photos</button>
+    </div>
+
+    <script>
+
+	  	//  pop up that would contain all pages a user is an admin of
+		$(function() {
+            $( "#instagramPopup" ).dialog({
+				autoOpen: false,
+				open: function(event, ui) { $(".ui-dialog-titlebar-close").hide(); },
+				modal: true,
+				width:500,
+				closeOnEscape: false,
+				position: {
+                  my: "top",
+                  at: "top"
+				}
+            });
+         });
+
+		//  open any facebook dialog
+		$.fn.openAnyInstagramDialog = function(dialogId) {
+			$(dialogId).dialog( "open" );
+		};
+
+		//  hide any facebook dialog
+		$.fn.closeAnyInstagramDialog = function(dialogId) {
+			$(dialogId).empty();
+			$(dialogId).dialog( "destroy" );
+		};
+		//  global function for the child window to call
+		var myObject = {
+			GetUserStuffFromInstagram: function( instaAccessToken ) {
+			//alert (instaAccessToken);
+				console.log ("parents token = " + instaAccessToken);
+				var linkToGetPhotos = "https://api.instagram.com/v1/users/self/?access_token=" + instaAccessToken;
+
+				$.ajax({
+					method: "GET",
+					url: linkToGetPhotos,
+					dataType: "jsonp",
+					jsonp: "callback",
+					jsonpCallback: "jsonpcallback",
+					success: function(data) {
+
+						GetBasicInstagramInfo (data);
+					},
+					error: function(jqXHR, textStatus, errorThrown) {
+						//alert("Check you internet Connection");
+						console.log ("Error =()");
+					}
+				});
+				//  get a certain number of photos
+				//var num_photos = 4;
+				$.ajax({
+					url: 'https://api.instagram.com/v1/users/self/media/recent',
+					dataType: 'jsonp',
+					type: 'GET',
+					data: {access_token: instaAccessToken},
+					success: function(data){
+						AddInstagramPhotosToPopup (data);
+					},
+					error: function(data){
+						console.log(data);
+					}
+				});
+
+			}
+		};
+
+		function GetBasicInstagramInfo (data) {
+
+			console.log (data ['data']);
+			console.log ("Number of followers: " + data ['data']['counts'].followed_by);
+		}
+
+
+		function embedInstagramPhotosInPopup () {
+			$("#instaPhotos").empty();
+			for(i=firstPhotoIgToDisplay; i<lastPhotoIgToDisplay; i++ )
+			{
+				var img = $('<img ' +'>');
+				img.attr('src', igPhotosData.data[i].images.standard_resolution.url);
+				img.appendTo("#instaPhotos");
+
+
+				//$("#instaPhotos").append('<img src="'+igPhotosData.data[i].images.standard_resolution.url+'">');
+				if ($.inArray(igPhotosData.data[i].images.standard_resolution.url, instaPhotosToSave ) != -1)
+				{
+					//var clickedImage = $(this);
+					img.addClass("chosenInstaImage");
+				}
+
+			}
+		}
+
+
+		function AddInstagramPhotosToPopup (data) {
+			//console.log(data);
+			$.fn.openAnyInstagramDialog("#instagramPopup");
+			igPhotosData = data;
+
+			totalNumberOfIgPhotos = igPhotosData.data.length;
+
+			numberOfPagesWithIgPhotos = Math.ceil(totalNumberOfIgPhotos / igPhotosPerPage);
+				console.log (numberOfPagesWithIgPhotos);
+
+				console.log (totalNumberOfIgPhotos);
+
+				if (totalNumberOfIgPhotos <= igPhotosPerPage)
+				{
+				    $( "#previousIGPhotos" ).hide ();
+				    $( "#nextIGPhotos" ).hide ();
+				}
+				else
+				{
+				    $( "#previousIGPhotos" ).hide ();
+				}
+
+
+			//  if there are no photos, don't do anything
+			if (totalNumberOfIgPhotos == 0)
+			{
+				return;
+			}
+
+
+			embedInstagramPhotosInPopup ();
+		}
+
+
+		var parentWindow;
+
+
+		var igPhotosData;
+		var totalNumberOfIgPhotos = 0;
+		var igPhotosPerPage = 1;
+		var numberOfPagesWithIgPhotos = 0;
+		var currentPage = 0;
+		var firstPhotoIgToDisplay = 0;
+		var lastPhotoIgToDisplay = igPhotosPerPage;
+		var instaPhotosToSave = [];
+
+	  $().ready(function() {
+
+		$( "#previousIGPhotos" ).click(function() {
+
+			console.log ("previousIGPhotos");
+			currentPage --;
+
+			firstPhotoIgToDisplay = currentPage * igPhotosPerPage;
+			lastPhotoIgToDisplay = firstPhotoIgToDisplay + igPhotosPerPage;
+
+
+			console.log ("Back " + currentPage);
+			console.log ("Back " + firstPhotoIgToDisplay);
+			console.log ("Back " + lastPhotoIgToDisplay);
+
+			embedInstagramPhotosInPopup ();
+
+			$( "#nextIGPhotos" ).show ();
+			if (currentPage == 0)
+			{
+				$( "#previousIGPhotos" ).hide ();
+			}
+		});
+
+		$( "#nextIGPhotos" ).click(function() {
+			console.log ("nextIGPhotos");
+			currentPage ++;
+			firstPhotoIgToDisplay = currentPage * igPhotosPerPage;
+			if (firstPhotoIgToDisplay + igPhotosPerPage > totalNumberOfIgPhotos)
+			{
+				lastPhotoIgToDisplay = totalNumberOfIgPhotos;
+			}
+			else
+			{
+				lastPhotoIgToDisplay = firstPhotoIgToDisplay + igPhotosPerPage;
+			}
+
+			console.log ("Back " + currentPage);
+			console.log ("Forward " + firstPhotoIgToDisplay);
+			console.log ("Forward " + lastPhotoIgToDisplay);
+
+			embedInstagramPhotosInPopup ();
+
+			$( "#previousIGPhotos" ).show ();
+			if (currentPage == numberOfPagesWithIgPhotos - 1)
+			{
+				$( "#nextIGPhotos" ).hide ();
+			}
+		});
+
+
+		//  this one works only for the child window
+		var urlToAuthenticate = "https://api.instagram.com/oauth/authorize/?client_id={APP-ID}&redirect_uri=http://{website}/instagram-js/&response_type=token&scope=basic";
+		//  make sure that this link is changed for Muba, as well as ID
+		$('#instaLoginButton').click(function(){
+			//window.open(urlToAuthenticate,"Ratting","width=640, height=600,left=150,top=200,toolbar=0,status=0,");
+			openInstagramCallback ();
+		});
+		var instagramCallbackWindow;
+		function openInstagramCallback()
+		{
+			if(instagramCallbackWindow == null || instagramCallbackWindow.closed)
+			  {
+			  //  set the parent window
+				parentWindow = window;
+				instagramCallbackWindow = window.open(urlToAuthenticate, "Instagram callback", "width=640, height=600,left=150,top=200,resizable=yes,scrollbars=yes,status=yes");
+			  }
+		}
+
+		var currentUrl = window.location.href ;
+		if (currentUrl.indexOf ("access_token=") >= 0)
+		{
+			//  get access token from the child's window
+			var si = currentUrl.indexOf ("access_token=") + 13;
+			//console.log (currentUrl + ", " + currentUrl.indexOf ("access_token=") + ", " + currentUrl.substring (si));
+			close();
+			opener.myObject.GetUserStuffFromInstagram( currentUrl.substring (si) );
+		}
+
+		//  choose images that you wanna transfer
+		//  body - because the shit is loaded dynamically
+		$('body').on('click','#instagramPopup #instaPhotos img',function(){
+				//  if such photo wasn't chosen yet
+			if ($.inArray(this.src, instaPhotosToSave ) == -1)
+			{
+				console.log ("Add");
+				instaPhotosToSave.push (this.src);
+				var clickedImage = $(this);
+				clickedImage.addClass("chosenInstaImage");
+			}
+			else
+			{
+					//  else remove it
+				console.log ("Remove");
+				instaPhotosToSave.splice( $.inArray(this.src, instaPhotosToSave), 1 );
+				var clickedImage = $(this);
+				clickedImage.removeClass("chosenInstaImage");
+			}
+		});
+
+		//  photos are chosen
+		$( "#instaPhotosAreChosen" ).click(function() {
+
+			$.fn.closeAnyInstagramDialog ("#instagramPopup" );
+			console.log (JSON.stringify (instaPhotosToSave));
+			//close();
+		});
+
+	});
+    </script>
+</body>
+</html>
